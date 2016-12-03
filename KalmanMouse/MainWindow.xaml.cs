@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO.Packaging;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -27,16 +28,19 @@ namespace WpfApplication1
         GaussianRandom rnd;
 
         // [x y x' y']
-        Vector<double> Xprev = Vector<double>.Build.Dense(2);
-        Matrix<double> Pprev = Matrix<double>.Build.Dense(2,2);
 
         private Point curMousePos;
 
-        private double sigma = 5;
+        private static double sigma = 10;
+
+        Matrix<double> Pprev = Matrix<double>.Build.DiagonalOfDiagonalArray(new[] {sigma, sigma});
+        Vector<double> Xprev = Vector<double>.Build.Dense(2);
 
         private bool running = true;
 
-        private double dt = 0.1;
+        private double dt = 0.016;
+
+        private Point prevMousePos;
 
         public MainWindow()
         {
@@ -55,6 +59,9 @@ namespace WpfApplication1
 
         public void IterateKalman()
         {
+            if (prevMousePos == curMousePos) return;
+            prevMousePos = curMousePos;
+
             var A = Matrix<double>.Build.DenseOfArray(new double[,] {
                 { 1, 0 },
                 { 0, 1 },
@@ -68,10 +75,10 @@ namespace WpfApplication1
             var H = Matrix<double>.Build.DiagonalIdentity(2);
             var C = Matrix<double>.Build.DiagonalIdentity(2);
 
-            var Q = Matrix<double>.Build.DenseOfArray(new[,]
+            var Q = Matrix<double>.Build.DenseOfArray(new double[,]
             {
-                { Math.Pow(sigma, 2), 0},
-                { 0, Math.Pow(sigma, 2)},
+                { sigma, 0},
+                { 0, sigma},
             });
 
             var mesuredPos = curMousePos;
@@ -102,7 +109,7 @@ namespace WpfApplication1
 
             var K = (Pkp * H.Transpose()) * (H * (Pkp * H.Transpose()) + R).Inverse();
 
-            //Console.WriteLine($"K = {K}");
+            Console.WriteLine($"K = {K}");
 
             var Xk = Xkp + K * (Yk - H * Xkp);
 
