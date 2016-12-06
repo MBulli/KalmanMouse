@@ -61,40 +61,40 @@ namespace WpfApplication1
         {
             if (prevMousePos == curMousePos) return;
 
-            var A = Matrix<double>.Build.DenseOfArray(new double[,] {
+            var A = CreateMatrix.DenseOfArray<double>(new double[,] {
                 { 1, 0, dt, 0},
                 { 0, 1, 0, dt},
                 { 0, 0, 1, 0 },
                 { 0, 0, 0, 1 },
             });
 
-            var B = Vector<double>.Build.DenseOfArray(new[] {
+            var B = CreateVector.DenseOfArray<double>(new[] {
                 0.5 * dt*dt,
                 0.5 * dt*dt,
                 0,
                 0
             });
 
-            var H = Matrix<double>.Build.DiagonalIdentity(4);
-            var C = Matrix<double>.Build.DiagonalIdentity(4);
+            var H = CreateMatrix.DiagonalIdentity<double>(4);
+            var C = CreateMatrix.DiagonalIdentity<double>(4);
 
-            var G = Vector<double>.Build.DenseOfArray(new[] {0.5*dt*dt, 0.5*dt*dt, dt, dt});
+            var G = CreateVector.DenseOfArray<double>(new[] {0.5*dt*dt, 0.5*dt*dt, dt, dt});
 
             var Q = G.ToColumnMatrix()*G.ToRowMatrix()*10;
 
             var mesuredPos = curMousePos;
             mesuredPos.Offset(rnd.NextDouble(), rnd.NextDouble());
 
-            var M = Vector<double>.Build.DenseOfArray(new[] {
+            var M = CreateVector.DenseOfArray<double>(new[] {
                 mesuredPos.X,
                 mesuredPos.Y,
                 (curMousePos.X - prevMousePos.X) / dt,
                 (curMousePos.Y - prevMousePos.Y) / dt,
             });
 
-            var Z = Vector<double>.Build.Dense(4, value: 0);
+            var Z = CreateVector.Dense<double>(4, value: 0);
 
-            var R = Matrix<double>.Build.Diagonal(new[]
+            var R = CreateMatrix.Diagonal<double>(new[]
             {
                 sigma, sigma, sigma/2, sigma/2
             });
@@ -115,7 +115,7 @@ namespace WpfApplication1
 
             var Xk = Xkp + K * (Yk - H * Xkp);
 
-            var Pk = (Matrix<double>.Build.DiagonalIdentity(4) - K * H) * Pkp;
+            var Pk = (CreateMatrix.DiagonalIdentity<double>(4) - K * H) * Pkp;
 
             //Console.WriteLine($"Pk = {Pk}");
 
