@@ -31,10 +31,10 @@ namespace WpfApplication1
 
         private Point curMousePos;
 
-        private static double sigma = 10;
+        private static double sigma = 0.01;
 
-        Matrix<double> Pprev = Matrix<double>.Build.DiagonalOfDiagonalArray(new[] {sigma, sigma});
-        Vector<double> Xprev = Vector<double>.Build.Dense(2);
+        Matrix<double> Pprev = Matrix<double>.Build.DiagonalOfDiagonalArray(new []{ sigma, sigma, sigma / 2, sigma / 2 });
+        Vector<double> Xprev = Vector<double>.Build.Dense(4);
 
         private bool running = true;
 
@@ -60,41 +60,43 @@ namespace WpfApplication1
         public void IterateKalman()
         {
             if (prevMousePos == curMousePos) return;
-            prevMousePos = curMousePos;
 
             var A = Matrix<double>.Build.DenseOfArray(new double[,] {
-                { 1, 0 },
-                { 0, 1 },
+                { 1, 0, dt, 0},
+                { 0, 1, 0, dt},
+                { 0, 0, 1, 0 },
+                { 0, 0, 0, 1 },
             });
 
             var B = Vector<double>.Build.DenseOfArray(new[] {
                 0.5 * dt*dt,
                 0.5 * dt*dt,
+                0,
+                0
             });
 
-            var H = Matrix<double>.Build.DiagonalIdentity(2);
-            var C = Matrix<double>.Build.DiagonalIdentity(2);
+            var H = Matrix<double>.Build.DiagonalIdentity(4);
+            var C = Matrix<double>.Build.DiagonalIdentity(4);
 
-            var Q = Matrix<double>.Build.DenseOfArray(new double[,]
-            {
-                { sigma, 0},
-                { 0, sigma},
-            });
+            var G = Vector<double>.Build.DenseOfArray(new[] {0.5*dt*dt, 0.5*dt*dt, dt, dt});
+
+            var Q = G.ToColumnMatrix()*G.ToRowMatrix()*10;
 
             var mesuredPos = curMousePos;
             mesuredPos.Offset(rnd.NextDouble(), rnd.NextDouble());
 
             var M = Vector<double>.Build.DenseOfArray(new[] {
                 mesuredPos.X,
-                mesuredPos.Y
+                mesuredPos.Y,
+                (curMousePos.X - prevMousePos.X) / dt,
+                (curMousePos.Y - prevMousePos.Y) / dt,
             });
 
-            var Z = Vector<double>.Build.Dense(2, value: 0);
+            var Z = Vector<double>.Build.Dense(4, value: 0);
 
             var R = Matrix<double>.Build.Diagonal(new[]
             {
-                Math.Pow(sigma,2),
-                Math.Pow(sigma,2),
+                sigma, sigma, sigma/2, sigma/2
             });
 
             // No acceleration
@@ -113,7 +115,7 @@ namespace WpfApplication1
 
             var Xk = Xkp + K * (Yk - H * Xkp);
 
-            var Pk = (Matrix<double>.Build.DiagonalIdentity(2) - K * H) * Pkp;
+            var Pk = (Matrix<double>.Build.DiagonalIdentity(4) - K * H) * Pkp;
 
             //Console.WriteLine($"Pk = {Pk}");
 
@@ -123,6 +125,7 @@ namespace WpfApplication1
             //inkCanvas.Strokes.Add(new Stroke(new StylusPointCollection(new[] { pos })));
             AddToLine(new Point(Xprev[0], Xprev[1]));
             DrawPoint(mesuredPos, Colors.Red);
+            prevMousePos = curMousePos;
         }
 
         private void DrawPoint(Point p, Color c)
