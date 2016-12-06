@@ -17,6 +17,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 
 using MathNet.Numerics.LinearAlgebra;
+using System.Windows.Threading;
 
 namespace WpfApplication1
 {
@@ -26,6 +27,7 @@ namespace WpfApplication1
     public partial class MainWindow : Window
     {
         GaussianRandom rnd;
+        DispatcherTimer timer;
 
         // [x y x' y']
 
@@ -36,30 +38,26 @@ namespace WpfApplication1
         Matrix<double> Pprev = Matrix<double>.Build.DiagonalOfDiagonalArray(new []{ sigma, sigma, sigma / 2, sigma / 2 });
         Vector<double> Xprev = Vector<double>.Build.Dense(4);
 
-        private bool running = true;
-
         private double dt = 0.016;
 
         private Point prevMousePos;
+
+        
 
         public MainWindow()
         {
             InitializeComponent();
 
             rnd = new GaussianRandom(mean: 0, standardDeviation: sigma);
-            Task.Run(() =>
-            {
-                while (running)
-                {
-                    IterateKalman();
-                    Thread.Sleep(TimeSpan.FromSeconds(dt));
-                }
-            });
+            timer = new DispatcherTimer(TimeSpan.FromSeconds(dt), DispatcherPriority.Normal, TimerTick, this.Dispatcher);
         }
+
+        private void TimerTick(object sender, EventArgs e) => IterateKalman();
 
         public void IterateKalman()
         {
-            if (prevMousePos == curMousePos) return;
+            if (prevMousePos == curMousePos)
+                return;
 
             var A = CreateMatrix.DenseOfArray<double>(new double[,] {
                 { 1, 0, dt, 0},
@@ -130,37 +128,30 @@ namespace WpfApplication1
 
         private void DrawPoint(Point p, Color c)
         {
-            Dispatcher.Invoke(() =>
+            inkCanvasMeasured.Strokes.Add(new Stroke(new StylusPointCollection(new[] { p }), new DrawingAttributes { Color = c }));
+            if (inkCanvasMeasured.Strokes.Count > 50)
             {
-                inkCanvasMeasured.Strokes.Add(new Stroke(new StylusPointCollection(new[] {p}), new DrawingAttributes {Color = c}));
-                if (inkCanvasMeasured.Strokes.Count > 50)
-                {
-                    inkCanvasMeasured.Strokes.RemoveAt(0);
-                }
-            });
+                inkCanvasMeasured.Strokes.RemoveAt(0);
+            }
         }
 
         
         private void AddToLine(Point p)
         {
-
-            Dispatcher.Invoke(() =>
+            if (inkCanvasEstimated.Strokes.Count == 0)
             {
-                if (inkCanvasEstimated.Strokes.Count == 0)
+                inkCanvasEstimated.Strokes.Add(new Stroke(new StylusPointCollection(new[] { p }),
+                    new DrawingAttributes { Color = Colors.Green }));
+            }
+            else
+            {
+                Stroke stroke = inkCanvasEstimated.Strokes[0];
+                stroke.StylusPoints.Add(new StylusPoint(p.X, p.Y));
+                if (stroke.StylusPoints.Count > 50)
                 {
-                    inkCanvasEstimated.Strokes.Add(new Stroke(new StylusPointCollection(new[] { p }),
-                        new DrawingAttributes {Color = Colors.Green}));
+                    stroke.StylusPoints.RemoveAt(0);
                 }
-                else
-                {
-                    Stroke stroke = inkCanvasEstimated.Strokes[0];
-                    stroke.StylusPoints.Add(new StylusPoint(p.X, p.Y));
-                    if (stroke.StylusPoints.Count > 50)
-                    {
-                        stroke.StylusPoints.RemoveAt(0);
-                    }
-                }
-            });
+            }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
