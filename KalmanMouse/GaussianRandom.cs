@@ -10,8 +10,8 @@ namespace WpfApplication1
     {
         private readonly Random rand;
 
-        public readonly double Mean;
-        public readonly double StandardDeviation;
+        public double Mean;
+        public double StandardDeviation;
 
         public GaussianRandom(double mean = 0, double standardDeviation = 1, int? seed = null)
         {

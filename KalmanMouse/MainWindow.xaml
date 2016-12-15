@@ -5,9 +5,21 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfApplication1"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
-    <Grid>
+        Title="MainWindow" Height="350" Width="525"
+        Loaded="MainWindow_OnLoaded"
+        DataContext="{Binding RelativeSource={RelativeSource Self}}">
+    <Grid Background="Black">
         <InkCanvas x:Name="inkCanvasMeasured" Background="Transparent" EditingMode="None" />
-        <InkCanvas x:Name="inkCanvasEstimated" Background="Transparent" EditingMode="None" />
+        <InkCanvas x:Name="inkCanvasEstimated1" Background="Transparent" EditingMode="None" />
+        <InkCanvas x:Name="inkCanvasEstimated2" Background="Transparent" EditingMode="None" />
+        <StackPanel Orientation="Vertical" Margin="8">
+            <TextBlock Text="{Binding Path=XSpeed, StringFormat=XSpeed: {0,5:####}}" Foreground="White" FontFamily="Consolas"/>
+            <TextBlock Text="{Binding Path=YSpeed, StringFormat=YSpeed: {0,5:####}}" Foreground="White" FontFamily="Consolas"/>
+        </StackPanel>
+        <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Margin="8">
+            <TextBlock Text="Messpunkte" Foreground="Red"/>
+            <TextBlock Text="Schätzung" Foreground="Blue"/>
+            <TextBlock Text="Kalmankorrektur" Foreground="Green"/>
+        </StackPanel>
     </Grid>
 </Window>
