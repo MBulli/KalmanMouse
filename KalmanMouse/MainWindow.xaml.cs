@@ -53,6 +53,8 @@ namespace WpfApplication1
         public double XSpeed => Xprev[2];
         public double YSpeed => Xprev[3];
 
+        public double Sigma => sigma;
+
         [DllImport("User32.dll")]
         private static extern bool SetCursorPos(int x, int y);
 
@@ -210,11 +212,13 @@ namespace WpfApplication1
                 case Key.OemPlus:
                     sigma *= 1.5;
                     rnd.StandardDeviation = sigma;
+                    OnPropertyChanged(nameof(Sigma));
                     break;
                 case Key.Subtract:
                 case Key.OemMinus:
                     sigma /= 1.5;
                     rnd.StandardDeviation = sigma;
+                    OnPropertyChanged(nameof(Sigma));
                     break;
                 case Key.Space:
                     pauseWhileNotMoving = !pauseWhileNotMoving;

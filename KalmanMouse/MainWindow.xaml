@@ -13,8 +13,9 @@
         <InkCanvas x:Name="inkCanvasEstimated1" Background="Transparent" EditingMode="None" />
         <InkCanvas x:Name="inkCanvasEstimated2" Background="Transparent" EditingMode="None" />
         <StackPanel Orientation="Vertical" Margin="8">
-            <TextBlock Text="{Binding Path=XSpeed, StringFormat=XSpeed: {0,5:####}}" Foreground="White" FontFamily="Consolas"/>
-            <TextBlock Text="{Binding Path=YSpeed, StringFormat=YSpeed: {0,5:####}}" Foreground="White" FontFamily="Consolas"/>
+            <TextBlock Text="{Binding Path=Sigma, StringFormat=Sigma: {0,7:##0.000}}" Foreground="White" FontFamily="Consolas"/>
+            <TextBlock Text="{Binding Path=XSpeed, StringFormat=XSpeed: {0,5:###0}}" Foreground="White" FontFamily="Consolas"/>
+            <TextBlock Text="{Binding Path=YSpeed, StringFormat=YSpeed: {0,5:###0}}" Foreground="White" FontFamily="Consolas"/>
         </StackPanel>
         <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Margin="8">
             <TextBlock Text="Messpunkte" Foreground="Red"/>
