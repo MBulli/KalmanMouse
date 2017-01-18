@@ -30,40 +30,94 @@ namespace WpfApplication1
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        GaussianRandom rnd;
-        DispatcherTimer timer;
-
-        // [x y x' y']
+        private GaussianRandom rnd = new GaussianRandom(mean: 0, standardDeviation: 1);
+        private DispatcherTimer timer;
 
         private Point curMousePos;
-
-        private static double sigma = 5;
-
-        private bool pauseWhileNotMoving = false;
-
-        Matrix<double> Pprev = Matrix<double>.Build.DiagonalOfDiagonalArray(new []{ sigma, sigma, sigma / 2, sigma / 2 });
-        Vector<double> Xprev = Vector<double>.Build.Dense(4);
-
-        private double dt = 0.016;
-
         private Point prevMousePos;
 
-        private DiscreteKalmanFilter kalmanFilter;
+        private bool pauseWhileNotMoving;
 
+        Matrix<double> Pprev;
+        Vector<double> Xprev;
+
+        // time between mesurments
+        private const double dt = 0.016;
+
+        // system Matrix
+        private Matrix<double> A = CreateMatrix.DenseOfArray(new double[,] {
+            { 1, 0, dt, 0},
+            { 0, 1, 0, dt},
+            { 0, 0, 1, 0 },
+            { 0, 0, 0, 1 },
+        });
+
+        // system modification transformation Matrix
+        private Matrix<double> B = CreateMatrix.DenseOfArray(new double[,] {
+            { 0.5 * dt* dt },
+            { 0.5 * dt* dt },
+            { 0.0 },
+            { 0.0 }
+        });
+
+        // system modification value vector
+        private Vector<double> a = CreateVector.DenseOfArray(new double[]
+        {
+            0.0
+        });
+
+        // system covariance Matrix
+        private Matrix<double> Q = CreateMatrix.DenseOfArray(new double[,] {
+            { 0.0001, 0, 0, 0 },
+            { 0, 0.0001, 0, 0 },
+            { 0, 0, 0.1, 0 },
+            { 0, 0, 0, 0.1 },
+        });
+
+        // state to mesurement convertion matrix
+        private Matrix<double> H = CreateMatrix.DiagonalIdentity<double>(2, 4);
+
+        // mesurement covariance Matrix
+        private Matrix<double> R = CreateMatrix.DiagonalIdentity<double>(2);
+        
         public double XSpeed => Xprev[2];
         public double YSpeed => Xprev[3];
 
-        public double Sigma => sigma;
+        private double minSigma = 5/Math.Pow(1.5, 21);
+        private double maxSigma = 5*Math.Pow(1.5, 15);
+        // messurment spread
+        private double sigma;
+        public double Sigma {
+            get { return sigma; }
+            set
+            {
+                if (value < minSigma)
+                    sigma = minSigma;
+                else if (value > maxSigma)
+                    sigma = maxSigma;
+                else
+                    sigma = value;
+                R[0, 0] = sigma*dt;
+                R[1, 1] = R[0, 0];
+                rnd.StandardDeviation = sigma;
+                OnPropertyChanged();
+            }
+        }
 
         [DllImport("User32.dll")]
         private static extern bool SetCursorPos(int x, int y);
-
-
+        
         public MainWindow()
         {
-            InitializeComponent();
 
-            rnd = new GaussianRandom(mean: 0, standardDeviation: sigma);
+            Sigma = 5;
+
+            Pprev = Matrix<double>.Build.DiagonalOfDiagonalArray(new[] { sigma, sigma, sigma / 2, sigma / 2 });
+            Xprev = Vector<double>.Build.Dense(4);
+
+            pauseWhileNotMoving = false;
+
+            InitializeComponent();
         }
 
         private void TimerTick(object sender, EventArgs e) => IterateKalman();
@@ -72,83 +126,47 @@ namespace WpfApplication1
         {
             if (pauseWhileNotMoving && prevMousePos == curMousePos)
                 return;
-
-            var A = CreateMatrix.DenseOfArray<double>(new double[,] {
-                { 1, 0, dt, 0},
-                { 0, 1, 0, dt},
-                { 0, 0, 1, 0 },
-                { 0, 0, 0, 1 },
-            });
-
-            var B = CreateVector.DenseOfArray<double>(new[] {
-                0.5 * dt*dt,
-                0.5 * dt*dt,
-                0,
-                0
-            });
-
-            var H = CreateMatrix.DiagonalIdentity<double>(2, 4);
-            var C = CreateMatrix.DiagonalIdentity<double>(2);
-
-            var G = CreateVector.DenseOfArray<double>(new[] {0.5*dt*dt, 0.5*dt*dt, dt, dt});
-
-            //var Q = G.ToColumnMatrix()*G.ToRowMatrix()*100000;
-            var Q = CreateMatrix.DenseOfArray(new double[,] {
-                { 0.0001, 0, 0, 0 },
-                { 0, 0.0001, 0, 0 },
-                { 0, 0, 0.1, 0 },
-                { 0, 0, 0, 0.1 },
-            });
-                
-
+            
+            // add mesurement spread to the mouse pos
             var mesuredPos = curMousePos;
             mesuredPos.Offset(rnd.NextDouble(), rnd.NextDouble());
 
-            var M = CreateVector.DenseOfArray<double>(new[] {
+            // prepare mesurement Vector
+            var M = CreateVector.DenseOfArray(new[] {
                 mesuredPos.X,
                 mesuredPos.Y,
             });
 
-            var Z = CreateVector.Dense<double>(2, value: 0);
+            // calc state vector prediction
+            var Xkp = A * Xprev + B * a;
 
-            var R = CreateMatrix.Diagonal<double>(new[]
-            {
-                sigma * dt, sigma * dt
-            });
-
-            // No acceleration
-            double u = 0;
-            double w = 0;
-
-            var Xkp = A * Xprev + B * u + w;
-
+            // calc covariance matrix prediction
             var Pkp = A * (Pprev * A.Transpose()) + Q;
 
-            var Yk = C * M + Z;
-
+            // calc kalman gain
             var K = (Pkp * H.Transpose()) * (H * (Pkp * H.Transpose()) + R).Inverse();
             
-            var Xk = Xkp + K * (Yk - H * Xkp);
+            // calc new state
+            var Xk = Xkp + K * (M - H * Xkp);
 
+            // calc new covariance matrix
             var Pk = (CreateMatrix.DiagonalIdentity<double>(4) - K * H) * Pkp;
 
+            // save current state for next iteration
             Xprev = Xk;
             Pprev = Pk;
 
+            // update UI
             OnPropertyChanged(nameof(XSpeed));
             OnPropertyChanged(nameof(YSpeed));
 
-            kalmanFilter.Predict(A, Q);
-            kalmanFilter.Update(M.ToColumnMatrix(), H, R);
-
-            //Console.WriteLine($"CurState: {kalmanFilter.State}");
-            //Console.WriteLine($"CurCov: {kalmanFilter.Cov}");
-
-            //inkCanvas.Strokes.Add(new Stroke(new StylusPointCollection(new[] { pos })));
-            //AddToLine(inkCanvasEstimated1, new Point(kalmanFilter.State[0, 0], kalmanFilter.State[1, 0]), Colors.Blue);
-            AddToLine(inkCanvasEstimated2, new Point(Xprev[0], Xprev[1]), Colors.Green);
+            // draw predicted line
             AddToLine(inkCanvasEstimated1, new Point(Xkp[0], Xkp[1]), Colors.Blue);
+            // draw corrected line
+            AddToLine(inkCanvasEstimated2, new Point(Xprev[0], Xprev[1]), Colors.Green);
+            // draw mesurment points
             DrawPoint(mesuredPos, Colors.Red);
+
             prevMousePos = curMousePos;
         }
 
@@ -189,9 +207,6 @@ namespace WpfApplication1
         private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
         {
             timer = new DispatcherTimer(TimeSpan.FromSeconds(dt), DispatcherPriority.Normal, TimerTick, this.Dispatcher);
-            kalmanFilter = new DiscreteKalmanFilter(
-                CreateVector.Dense(new[] { inkCanvasMeasured.ActualWidth / 2, inkCanvasMeasured.ActualHeight / 2, 0.0, 0.0 }).ToColumnMatrix(),
-                Pprev);
             this.WindowState = WindowState.Maximized;
             Point mid = inkCanvasMeasured.PointToScreen(new Point(inkCanvasMeasured.ActualWidth / 2, inkCanvasMeasured.ActualHeight / 2));
             SetCursorPos((int) mid.X, (int) mid.Y);
@@ -210,15 +225,11 @@ namespace WpfApplication1
             {
                 case Key.Add:
                 case Key.OemPlus:
-                    sigma *= 1.5;
-                    rnd.StandardDeviation = sigma;
-                    OnPropertyChanged(nameof(Sigma));
+                    Sigma *= 1.5;
                     break;
                 case Key.Subtract:
                 case Key.OemMinus:
-                    sigma /= 1.5;
-                    rnd.StandardDeviation = sigma;
-                    OnPropertyChanged(nameof(Sigma));
+                    Sigma /= 1.5;
                     break;
                 case Key.Space:
                     pauseWhileNotMoving = !pauseWhileNotMoving;
